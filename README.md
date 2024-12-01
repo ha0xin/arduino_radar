@@ -28,7 +28,7 @@
 
 1. 安装依赖：
 ```bash
-pip install -e .
+pip install pyserial
 ```
 2. 硬件连接：
 - 舵机信号线 -> D9
