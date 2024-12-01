@@ -25,6 +25,10 @@ bool isLightOn = false;  // 是否点亮灯环
 
 uint8_t dist[181] = {0}; // 存储每个角度对应的距离
 
+unsigned long previousMillis = 0;  // 上次更新时间
+const long SERVO_INTERVAL = 15;    // 舵机更新间隔(ms)
+bool movingForward = true;        // 舵机运动方向
+
 void setup()
 {
   Serial.begin(BAUD_RATE);     // 初始化串口通信
@@ -36,120 +40,65 @@ void setup()
   FastLED.setBrightness(BRIGHTNESS);                               // 设置灯环亮度
 }
 
-void loop()
-{
-  // 检查串口是否有数据
-  if (Serial.available() > 0)
-  {
-    String command = Serial.readStringUntil('\n'); // 读取命令
-
-    // 处理不同的命令
-    if (command.startsWith("A"))
-    {
-      int angle = command.substring(1).toInt(); // 提取角度值
-      if (angle >= 15 && angle <= 165)
-      {
+void loop() {
+  // 先检查串口命令
+  if (Serial.available() > 0) {
+    String command = Serial.readStringUntil('\n');
+    
+    if (command.startsWith("A")) {
+      int angle = command.substring(1).toInt();
+      if (angle >= 15 && angle <= 165) {
         currentAngle = angle;
-        myServo.write(currentAngle); // 调整舵机到指定角度
-        Serial.print("Angle set to: ");
-        Serial.println(currentAngle);
+        myServo.write(currentAngle);
       }
     }
-    else if (command == "ONCE")
-    {
-      moveServoOnce();
-    }
-    else if (command == "START")
-    {
+    else if (command == "ONCE") {
       isRunning = true;
-      Serial.println("Continuous movement started.");
+      movingForward = true;
+      currentAngle = 15;  // 从起始位置开始
     }
-    else if (command == "STOP")
-    {
+    else if (command == "START") {
+      isRunning = true;
+    }
+    else if (command == "STOP") {
       isRunning = false;
       currentAngle = 90;
-      myServo.write(currentAngle); // 中立位置
-      Serial.println("Movement stopped.");
+      myServo.write(currentAngle);
     }
-    else if (command == "LON")
-    {
+    else if (command == "LON") {
       isLightOn = true;
     }
-    else if (command == "LOFF")
-    {
+    else if (command == "LOFF") {
       isLightOn = false;
       FastLED.clear();
       FastLED.show();
     }
   }
 
-  // 如果处于“START”模式，舵机会持续来回转动
-  if (isRunning)
-  {
-    moveServoBackAndForth();
-  }
-
-  // 对每个角度范围进行平均距离计算，并控制灯环颜色
-  if (isLightOn)
-  {
-    controlLEDsBasedOnDistance();
-  }
-
-  delay(100); // 稍微延时，避免过于频繁的串口输出
-}
-
-// 控制舵机来回转动一次
-void moveServoOnce()
-{
-  for (int pos = 15; pos <= 165; pos++)
-  {
-    myServo.write(pos);
-    currentAngle = pos; // 更新当前角度
-    controlLEDsBasedOnDistance();
-    delay(15);
-    reportCurrentStatus(); // 每次调整角度后报告状态
-  }
-  for (int pos = 165; pos >= 15; pos--)
-  {
-    myServo.write(pos);
-    currentAngle = pos; // 更新当前角度
-    controlLEDsBasedOnDistance();
-    delay(15);
-    reportCurrentStatus(); // 每次调整角度后报告状态
-  }
-  currentAngle = 90;
-  myServo.write(currentAngle);
-  Serial.println("Completed once movement.");
-}
-
-// 控制舵机持续来回转动
-void moveServoBackAndForth()
-{
-  static bool movingForward = true;
-
-  if (movingForward)
-  {
-    for (int pos = currentAngle; pos <= 165; pos++)
-    {
-      myServo.write(pos);
-      currentAngle = pos;
-      controlLEDsBasedOnDistance();
-      delay(15);
-      reportCurrentStatus();
+  // 使用millis()控制舵机运动
+  unsigned long currentMillis = millis();
+  if (isRunning && (currentMillis - previousMillis >= SERVO_INTERVAL)) {
+    previousMillis = currentMillis;
+    
+    if (movingForward) {
+      currentAngle++;
+      if (currentAngle >= 165) {
+        movingForward = false;
+      }
+    } else {
+      currentAngle--;
+      if (currentAngle <= 15) {
+        movingForward = true;
+      }
     }
-    movingForward = false;
+    
+    myServo.write(currentAngle);
+    reportCurrentStatus();
   }
-  else
-  {
-    for (int pos = 165; pos >= 15; pos--)
-    {
-      myServo.write(pos);
-      currentAngle = pos;
-      controlLEDsBasedOnDistance();
-      delay(15);
-      reportCurrentStatus();
-    }
-    movingForward = true;
+
+  // 控制LED
+  if (isLightOn) {
+    controlLEDsBasedOnDistance();
   }
 }
 
