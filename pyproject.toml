@@ -1,0 +1,9 @@
+[project]
+name = "arduino-radar"
+version = "0.1.0"
+description = "Arduino雷达扫描与可视化系统"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "pyserial>=3.5",
+]
